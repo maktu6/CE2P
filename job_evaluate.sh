@@ -8,7 +8,7 @@ DATA_DIRECTORY='./dataset/LIP'
 DATA_LIST_PATH='./dataset/list/lip/valList.txt' 
 NUM_CLASSES=20 
 RESTORE_FROM='./snapshots/LIP_CE2P_train.pth'
-SAVE_DIR='./outputs_val/' 
+SAVE_DIR='./outputs_val/LIP' 
 INPUT_SIZE='473,473'
 GPU_ID=0
  

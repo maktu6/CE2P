@@ -102,7 +102,7 @@ class PSPModule(nn.Module):
 
     def forward(self, feats):
         h, w = feats.size(2), feats.size(3)
-        priors = [F.upsample(input=stage(feats), size=(h, w), mode='bilinear') for stage in self.stages] + [feats]
+        priors = [F.upsample(input=stage(feats), size=(h, w), mode='bilinear', align_corners=True) for stage in self.stages] + [feats]
         bottle = self.bottleneck(torch.cat(priors, 1))
         return bottle
 
@@ -137,7 +137,7 @@ class ASPPModule(nn.Module):
 
         _, _, h, w = x.size()
 
-        feat1 = F.upsample(self.conv1(x), size=(h, w), mode='bilinear')
+        feat1 = F.upsample(self.conv1(x), size=(h, w), mode='bilinear', align_corners=True)
         # print(feat1.size())
         feat2 = self.conv2(x)
         feat3 = self.conv3(x)
@@ -179,7 +179,7 @@ class Decoder_Module(nn.Module):
     def forward(self, xt, xl):
         _, _, h, w = xl.size()
 
-        xt = F.upsample(self.conv1(xt), size=(h, w), mode='bilinear')
+        xt = F.upsample(self.conv1(xt), size=(h, w), mode='bilinear', align_corners=True)
         xl = self.conv2(xl)
         x = torch.cat([xt, xl], dim=1)
         x = self.conv3(x)
@@ -219,11 +219,11 @@ class Edge_Module(nn.Module):
         edge3_fea = self.conv3(x3)
         edge3 = self.conv4(edge3_fea)        
         
-        edge2_fea = F.upsample(edge2_fea, size=(h, w), mode='bilinear')
-        edge3_fea = F.upsample(edge3_fea, size=(h, w), mode='bilinear') 
+        edge2_fea = F.upsample(edge2_fea, size=(h, w), mode='bilinear', align_corners=True)
+        edge3_fea = F.upsample(edge3_fea, size=(h, w), mode='bilinear', align_corners=True) 
         
-        edge2 = F.upsample(edge2, size=(h, w), mode='bilinear')
-        edge3 = F.upsample(edge3, size=(h, w), mode='bilinear') 
+        edge2 = F.upsample(edge2, size=(h, w), mode='bilinear', align_corners=True)
+        edge3 = F.upsample(edge3, size=(h, w), mode='bilinear', align_corners=True) 
  
         edge = torch.cat([edge1, edge2, edge3], dim=1)
         edge_fea = torch.cat([edge1_fea, edge2_fea, edge3_fea], dim=1)
