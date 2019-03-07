@@ -3,3 +3,8 @@ snapshots/
 *.pyc
 __pycache__
 .vscode/
+.ipynb_checkpoints/
+*.ipynb
+job_test_old.sh
+outputs_test/
+test_old.py

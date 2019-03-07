@@ -7,7 +7,7 @@ import time
 
 import torch
 import cv2
-from torch.autograd import Variable
+# from torch.autograd import Variable
 import torchvision.models as models
 import torch.nn.functional as F
 from torch.utils import data
@@ -24,7 +24,7 @@ import torch.nn as nn
 IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434), dtype=np.float32)
   
 
-def get_arguments():
+def get_arguments(argv=None):
     """Parse all the arguments provided from the CLI.
     
     Returns:
@@ -49,7 +49,7 @@ def get_arguments():
                         help="Path to the output results.")
     parser.add_argument("--gpu", type=str, default='0',
                         help="choose gpu device.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 def get_palette(num_cls):
     """ Returns the color map for visualizing the segmentation mask.
@@ -109,7 +109,7 @@ def predict(net, image, output_size, is_mirror=True, scales=[1]):
     if is_mirror:
         image_rev = image[:,:,:,::-1]
 
-    interp = nn.Upsample(size=output_size, mode='bilinear')
+    interp = nn.Upsample(size=output_size, mode='bilinear', align_corners=True)
 
     outputs = []
     if is_mirror:
@@ -122,8 +122,8 @@ def predict(net, image, output_size, is_mirror=True, scales=[1]):
                 image_rev_scale = image_rev[0,:,:,:]
 
             image_scale = np.stack((image_scale,image_rev_scale))
-
-            prediction = net(Variable(torch.from_numpy(image_scale), volatile=True).cuda())
+            with torch.no_grad():
+                prediction = net(torch.from_numpy(image_scale).cuda())
 
             prediction = interp(prediction[1]).cpu().data.numpy()
 
@@ -148,8 +148,9 @@ def predict(net, image, output_size, is_mirror=True, scales=[1]):
                 image_scale = scale_image(image=image, scale=scale)
             else:
                 image_scale = image[0,:,:,:]
-
-            prediction = net(Variable(torch.from_numpy(image_scale).unsqueeze(0), volatile=True).cuda())
+            with torch.no_grad():
+                prediction = net(torch.from_numpy(image_scale.unsqueeze(0)).cuda())
+            #prediction = net(Variable(torch.from_numpy(image_scale), volatile=True).cuda())
             prediction = interp(prediction[1]).cpu().data.numpy()
             outputs.append(prediction[0,:,:,:])
 
@@ -189,7 +190,8 @@ def main():
         if index % 100 == 0:
             print('%d images have been proceeded'%(index))
         image,  ori_size, name = batch 
-          
+        if os.path.exists(args.save_dir+name[0]+'.png'):
+            continue
         ori_size = ori_size[0].numpy()
          
         output = predict(model, image.numpy(), (np.asscalar(ori_size[0]), np.asscalar(ori_size[1])), is_mirror=args.is_mirror, scales=[1])
@@ -197,8 +199,7 @@ def main():
 
         output_im = PILImage.fromarray(seg_pred) 
         output_im.putpalette(palette)
-        output_im.save(args.save_dir+name[0]+'.png')
-         
+        output_im.save(os.path.join(args.save_dir+name[0]+'.png'))
      
 if __name__ == '__main__':
     main() 
