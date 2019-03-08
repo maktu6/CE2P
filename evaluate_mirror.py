@@ -40,10 +40,30 @@ def get_arguments():
                         help="choose gpu device.")
     parser.add_argument("--input-size", type=str, default=INPUT_SIZE,
                         help="Comma-separated string with height and width of images.")
+    parser.add_argument("--mirror", action="store_true", help="combined with mirro results")
 
     return parser.parse_args()
 
-def valid(model, valloader, input_size, num_samples, gpus):
+def transform_flip_pred(pred_flip):
+    """" transform prediction from fliped images for combined with normal prediction
+    Args:
+        pred_flip: BxCxHxW
+    """
+    pred_flip_copy = pred_flip.copy()
+    right_idx = [15, 17, 19]
+    left_idx = [14, 16, 18]
+    for i in range(len(right_idx)):
+        pred_flip[:,right_idx[i],:,:] = pred_flip_copy[:,left_idx[i],:,:]
+        pred_flip[:,left_idx[i],:,:] = pred_flip_copy[:,right_idx[i],:,:]
+
+    pred_flip = pred_flip[:,:,:,::-1].copy()
+    return pred_flip
+
+def valid(model, valloader, input_size, num_samples, gpus, mirror=False):
+    """
+    Args:
+        mirror: combined with mirro results(only support single gpu)
+    """
     model.eval()
 
     parsing_preds = np.zeros((num_samples, input_size[0], input_size[1]),
@@ -56,6 +76,8 @@ def valid(model, valloader, input_size, num_samples, gpus):
     interp = torch.nn.Upsample(size=(input_size[0], input_size[1]), mode='bilinear', align_corners=True)
     with torch.no_grad():
         for index, batch in enumerate(valloader):
+            # if idx >1000:
+            #     break
             image, meta = batch
             num_images = image.size(0)
             if index % 10 == 0:
@@ -65,8 +87,12 @@ def valid(model, valloader, input_size, num_samples, gpus):
             s = meta['scale'].numpy()
             scales[idx:idx + num_images, :] = s[:, :]
             centers[idx:idx + num_images, :] = c[:, :]
-
-            outputs = model(image.cuda())
+            if mirror:
+                image_flip = torch.from_numpy(image.numpy()[:,:,:,::-1].copy())
+                image_all = torch.cat([image, image_flip])
+                outputs = model(image_all.cuda())
+            else:
+                outputs = model(image.cuda())
             if gpus > 1:
                 for output in outputs:
                     parsing = output[0][-1]
@@ -79,6 +105,10 @@ def valid(model, valloader, input_size, num_samples, gpus):
             else:
                 parsing = outputs[0][-1]
                 parsing = interp(parsing).data.cpu().numpy()
+                if mirror:
+                    pred_ori, pred_flip = np.split(parsing, 2, axis=0)
+                    pred_flip = transform_flip_pred(pred_flip)
+                    parsing = np.mean([pred_ori, pred_flip], axis=0)
                 parsing = parsing.transpose(0, 2, 3, 1)  # NCHW NHWC
                 parsing_preds[idx:idx + num_images, :, :] = np.asarray(np.argmax(parsing, axis=3), dtype=np.uint8)
 
@@ -133,9 +163,10 @@ def main():
     model.eval()
     model.cuda()
 
-    parsing_preds, scales, centers = valid(model, valloader, input_size, num_samples, len(gpus))
+    parsing_preds, scales, centers = valid(model, valloader, input_size, num_samples, len(gpus), args.mirror)
 
-    mIoU = compute_mean_ioU(parsing_preds, scales, centers, args.num_classes, args.data_dir, input_size)
+    mIoU = compute_mean_ioU(parsing_preds, scales, centers, args.num_classes,
+                            args.data_dir, input_size, num_sample=-1)
 
     print(mIoU)
 
