@@ -11,6 +11,7 @@ from copy import deepcopy
 from utils.transforms import transform_parsing
 from utils.utils import get_lip_palette
 from PIL import Image
+from time import time
 # from tqdm import tqdm
 
 DATA_DIRECTORY = '/ssd1/liuting14/Dataset/LIP/'
@@ -32,10 +33,14 @@ def get_arguments():
                         help="Path for saving inference results.")
     parser.add_argument("--data-dir", type=str,
                         help="Path to the directory containing the PASCAL VOC dataset.")
+    parser.add_argument('--image-ext', type=str, default='jpg',
+                        help='image file name extension (default: jpg)')
     parser.add_argument("--list-path", type=str,
                         help="Path to a txt file containing image names for inference.")
     parser.add_argument("--batch-size", type=int, default=1,
                         help="Number of images sent to the network in one step.")
+    parser.add_argument("--num_workers", type=int, default=0,
+                        help="Number of cpu workers for dataloader.")
     # parser.add_argument("--ignore-label", type=int, default=IGNORE_LABEL,
     #                     help="The index of the label to ignore during the training.")
     parser.add_argument("--num-classes", type=int, default=NUM_CLASSES,
@@ -74,12 +79,14 @@ def infer(model, valloader, input_size, num_samples, gpus, save_dir, mirror=Fals
     model.eval()
 
     interp = torch.nn.Upsample(size=(input_size[0], input_size[1]), mode='bilinear', align_corners=True)
+    current_t = time()
     with torch.no_grad():
         for index, batch in enumerate(valloader):
             image, meta = batch
             num_images = image.size(0)
             if index % 10 == 0:
-                print('%d  processd' % (index * num_images))
+                print('%d  processd in %.1fs' % (index * num_images, time()-current_t))
+                current_t = time()
 
             # extract infomation for recovering predicition
             c = meta['center'].numpy()
@@ -120,7 +127,7 @@ def transform_and_save(pred_batch, scales, centers, heights, widths, names, inpu
         pred = transform_parsing(pred_out, c, s, w, h, input_size=input_size)
         output_im = Image.fromarray(pred)
         output_im.putpalette(PALETTE)
-        output_im.save(os.path.join(save_dir+names[i]+'.png'))
+        output_im.save(os.path.join(save_dir, names[i]+'.png'))
 
 
 def main():
@@ -139,10 +146,10 @@ def main():
         normalize,
     ])
 
-    lip_dataset = InferDataSet(args.data_dir, args.list_path, crop_size=input_size, transform=transform)
+    lip_dataset = InferDataSet(args.data_dir, args.image_ext, crop_size=input_size, transform=transform)
     num_samples = len(lip_dataset)
-    valloader = data.DataLoader(lip_dataset, batch_size=args.batch_size * len(gpus),
-                                shuffle=False, pin_memory=True)
+    valloader = data.DataLoader(lip_dataset, batch_size=args.batch_size * len(gpus), 
+                                num_workers=args.num_workers, shuffle=False, pin_memory=True)
     # load model
     model = Res_Deeplab(num_classes=args.num_classes)
     restore_from = args.restore_from

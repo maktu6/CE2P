@@ -1,18 +1,19 @@
 #!/bin/bash
 
-SAVE_DIR='./outputs_test/DF_inshop_pred/' 
-DATA_ROOT='./dataset/DeepFashion-In-Shop'
-DATA_LIST_PATH='dataset/list/DeepFashion-In-Shop_list.txt'
+SAVE_DIR='/home/maktub/Downloads/public_dataset/DeepFashion/fashionGAN_dataset/CE2P_parse_for_img'
+DATA_ROOT='/home/maktub/Downloads/public_dataset/DeepFashion/fashionGAN_dataset/img'
 BS=16
+NUM_CPU=2
 GPU_IDS='0'
 INPUT_SIZE='384,384'
 SNAPSHOT_FROM='./snapshots/LIP_epoch_149.pth'
 NUM_CLASSES=20
 
+
 python3 infer_mirror.py --save-dir ${SAVE_DIR} \
                         --data-dir ${DATA_ROOT} \
-                        --list-path ${DATA_LIST_PATH} \
                         --batch-size ${BS} \
+                        --num_workers ${NUM_CPU} \
                         --num-classes ${NUM_CLASSES}\
                         --restore-from ${SNAPSHOT_FROM}\
                         --gpu ${GPU_IDS} \

@@ -4,6 +4,7 @@ import random
 import torch
 import cv2
 import json
+from glob import glob
 from torch.utils import data
 from dataset.target_generation import generate_edge
 from utils.transforms import get_affine_transform
@@ -130,18 +131,18 @@ class LIPDataSet(data.Dataset):
             return input, label_parsing, label_edge, meta
 
 class InferDataSet(LIPDataSet):
-    def __init__(self, root, list_path, crop_size=[473, 473], transform=None):
+    def __init__(self, root, image_ext="jpg", crop_size=[473, 473], transform=None):
         """ DataSet for inference
 
         Args:
             root: the root of dataset for inference
-            list_path: the path of txt file, which includes names of images(e.g. "xxx.jpg\n")
         """
         self.root = root
         self.aspect_ratio = crop_size[1] * 1.0 / crop_size[0]
         self.crop_size = np.asarray(crop_size)
         self.transform = transform
-        self.im_list = [i_id.strip() for i_id in open(list_path)]
+        root_pattern = os.path.join(self.root,"*.%s"%image_ext)
+        self.im_list = [os.path.basename(p) for p in glob(root_pattern)]
         self.number_samples = len(self.im_list)
 
     def __getitem__(self, index):
@@ -167,7 +168,7 @@ class InferDataSet(LIPDataSet):
             input = self.transform(input)
 
         meta = {
-            'name': im_name.split('.')[0],
+            'name': os.path.basename(im_name)[:-4], # drop file extension such as ".jpg" and ".png"
             'center': center,
             'height': h,
             'width': w,
